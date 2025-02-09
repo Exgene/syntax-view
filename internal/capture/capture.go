@@ -1,13 +1,18 @@
 package capture
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/png"
+	"net/http"
 	"os"
-	"os/exec"
-	"runtime"
 )
+
+type CarbonRequest struct {
+	Code string `json:"code"`
+}
 
 func Screenshot(filepath string) (image.Image, error) {
 	content, err := os.ReadFile(filepath)
@@ -15,88 +20,32 @@ func Screenshot(filepath string) (image.Image, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	htmlContent := generateHTML(string(content))
-	tmpFile, err := os.CreateTemp("", "code-*.html")
+	code := string(content)
+	requestBody := CarbonRequest{
+		Code: code,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if err := os.WriteFile(tmpFile.Name(), []byte(htmlContent), 0644); err != nil {
-		return nil, fmt.Errorf("failed to write temp file: %w", err)
+		return nil, fmt.Errorf("failed to marshall request body: %w", err)
 	}
 
-	var cmd *exec.Cmd
-	chrome := "google-chrome"
-	if runtime.GOOS == "darwin" {
-		chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-	}
+	url := "https://carbonara.solopov.dev/api/cook"
 
-	outputFile := filepath + ".png"
-	cmd = exec.Command(
-		chrome,
-		"--headless",
-		"--disable-gpu",
-		"--screenshot="+outputFile,
-		"--window-size=1280,800",
-		"file://"+tmpFile.Name(),
-	)
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to capture screenshot: %w", err)
-	}
-
-	imgFile, err := os.Open(outputFile)
+	response, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to open screenshot: %w", err)
+		return nil, fmt.Errorf("failed to get response from carbonara: %w", err)
 	}
-	defer imgFile.Close()
-	defer os.Remove(outputFile)
+	defer response.Body.Close()
 
-	img, err := png.Decode(imgFile)
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("carbonara API returned status code: %d", response.StatusCode)
+	}
+
+	img, err := png.Decode(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode screenshot: %w", err)
+		return nil, fmt.Errorf("failed to decode image from response: %w", err)
 	}
 
 	return img, nil
-}
-
-func generateHTML(content string) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-    <style>
-        body { 
-            background: white; 
-            padding: 20px; 
-            margin: 0;
-            min-width: 800px;
-        }
-        pre { 
-            margin: 0; 
-            background: #ffffff;
-            padding: 15px;
-        }
-        code { 
-            font-family: 'Monaco', 'Consolas', monospace; 
-            font-size: 14px; 
-            line-height: 1.4;
-        }
-    </style>
-</head>
-<body>
-    <pre><code>%s</code></pre>
-    <script>
-        document.addEventListener('DOMContentLoaded', (event) => {
-            document.querySelectorAll('pre code').forEach((el) => {
-                hljs.highlightElement(el);
-            });
-        });
-    </script>
-</body>
-</html>
-`, content)
 }

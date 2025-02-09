@@ -24,6 +24,12 @@ var captureCmd = &cobra.Command{
 and combines them into a single PDF document or Markdown format. Supports recursive
 directory traversal and syntax highlighting.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if inputDir == "" {
+			return fmt.Errorf("directory (-d, --dir) is required")
+		}
+		if outputFile == "" {
+			return fmt.Errorf("output file (-o, --output) is required")
+		}
 		return runCapture()
 	},
 }
@@ -31,13 +37,15 @@ directory traversal and syntax highlighting.`,
 func init() {
 	RootCmd.AddCommand(captureCmd)
 
-	captureCmd.Flags().StringVarP(&inputDir, "dir", "d", ".", "Directory to capture")
+	captureCmd.Flags().StringVarP(&inputDir, "dir", "d", "", "Directory to capture")
+	captureCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file path")
 	captureCmd.Flags().BoolVarP(&markdownMode, "markdown", "m", false, "Produces Output in a markdown File")
+
+	captureCmd.MarkFlagRequired("dir")
+	captureCmd.MarkFlagRequired("output")
 }
 
-func runCapture() error {
-	outputFile, _ = RootCmd.PersistentFlags().GetString("output")
-
+func processPDF() error {
 	gen := generate.NewPDFGenerator()
 
 	err := filepath.Walk(inputDir, func(path string, info os.FileInfo, err error) error {
@@ -50,16 +58,19 @@ func runCapture() error {
 		}
 
 		if shouldProcessFile(path) {
+			fmt.Printf("Processing: %s\n", path)
 			img, err := capture.Screenshot(path)
 			if err != nil {
-				return fmt.Errorf("failed to capture %s: %w", path, err)
+				fmt.Printf("Warning: failed to capture %s: %v\n", path, err)
+				return nil
 			}
 
 			if err := gen.AddPage(path, img); err != nil {
-				return fmt.Errorf("failed to add page: %w", path, err)
+				fmt.Printf("Warning: failed to add page for %s: %v\n", path, err)
+				return nil
 			}
 
-			fmt.Printf("Processed: %s\n", path)
+			fmt.Printf("Successfully processed: %s\n", path)
 		}
 
 		return nil
@@ -75,6 +86,17 @@ func runCapture() error {
 
 	fmt.Printf("Successfully generated PDF: %s\n", outputFile)
 	return nil
+}
+
+func processMarkdown() error {
+	return fmt.Errorf("markdown mode not implemented yet")
+}
+
+func runCapture() error {
+	if markdownMode {
+		return processMarkdown()
+	}
+	return processPDF()
 }
 
 func shouldProcessFile(path string) bool {

@@ -8,6 +8,10 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
+type MDGenerator struct {
+	md string
+}
+
 type PDFGenerator struct {
 	pdf *gofpdf.Fpdf
 }
@@ -17,8 +21,9 @@ func NewPDFGenerator() *PDFGenerator {
 	return &PDFGenerator{pdf: pdf}
 }
 
-func NewMDGenerator() {
-
+func NewMDGenerator(outputFile string) *MDGenerator {
+	md := outputFile
+	return &MDGenerator{md: md}
 }
 
 func (g *PDFGenerator) AddPage(filepath string, img image.Image) error {
