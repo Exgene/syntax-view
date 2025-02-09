@@ -1,6 +1,8 @@
-# Source Viewer (sv)
+# Syntax View (sv)
 
-A command-line tool that captures code files as screenshots and combines them into a single PDF document. The tool uses the Carbonara API to generate beautiful syntax-highlighted screenshots of your code.
+A command-line tool that captures code files as screenshots and combines them into a single PDF document. 
+
+The tool uses the Carbonara API to generate beautiful syntax-highlighted screenshots of your code.
 
 ## Installation
 
@@ -17,6 +19,8 @@ git clone https://github.com/exgene/syntax-view.git
 cd syntax-view
 go build
 ```
+
+You might need to add it to path for it to be globally available if you are building it from source
 
 ## Usage
 
